@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import os
 import requests
 import asyncio
+import operator
 import uuid # for memory
 from tools import playwright_tools, google_tool, reporter_tools
 from datetime import datetime
@@ -47,6 +48,7 @@ class State(TypedDict):
   criteria_met: bool
   rework_feedback: str
   route: str
+  search_count: Annotated[int, operator.add] #use this a the reducer, increment 1 each time search tool has been invoked
   #status: str
 
 
@@ -57,6 +59,7 @@ class ResearchAssistant:
         self.assistant_id = str(uuid.uuid4())
         self.routing_llm_with_output = None
         self.planner_llm_with_output = None
+        self.research_llm = None
         self.research_llm_with_tools = None
         self.evaluator_llm_with_output = None
         self.report_llm_with_tools = None
@@ -73,8 +76,8 @@ class ResearchAssistant:
         self.routing_llm_with_output  = routing_llm.with_structured_output(RouteDecisions)
         planner_llm = ChatOpenAI(model="gpt-5")
         self.planner_llm_with_output = planner_llm.with_structured_output(ResearchPlan)
-        research_llm = ChatOpenAI(model="gpt-5.4")
-        self.research_llm_with_tools= research_llm.bind_tools(self.search_tools)
+        self.research_llm = ChatOpenAI(model="gpt-5.4")
+        self.research_llm_with_tools= self.research_llm.bind_tools(self.search_tools)
         evaluator_llm = ChatAnthropic(model="claude-sonnet-4-5")
         self.evaluator_llm_with_output = evaluator_llm.with_structured_output(EvaluatorOutput)
         report_llm=ChatOpenAI(model="gpt-4.1")
@@ -130,7 +133,7 @@ class ResearchAssistant:
 
     def planner(self, state:State) -> Dict[str, Any]: #means keys are strings and values can be anything
         system_message = f"""You are a helpful assistant specialized in research planning. You take the user's research query
-            and decide on a list of key topics to research. 
+            and decide on a list of NO MORE THAN 5 key topics to research. 
             You make sure the research topics are relevant to the current times and provide useful insghts.
             The current date and time is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             """
@@ -154,7 +157,7 @@ class ResearchAssistant:
         The research plan is {state['research_plan']} which includes the research objective and a list of topics to research on.
         You MUST use either or both of these tools to help you: "browser_tools" and "google_tool".
         This is the success criteria: {state['success_criteria']}
-        When you have the research results already you need to go ahead and write the research report without further tool calls
+        When you have the research results already you need to go ahead and write the research report without further tool calls.
         You should produce a research report that is concise, accurate, up-to-date and neatly written. 
         Only output the research report itself in a markdown format and do not wrap it in code blocks or add extra explanation.
         Keep in mind that the result of your research will be evaluated by an evaluator based on accuracy and depth using the criteria,
@@ -185,12 +188,17 @@ class ResearchAssistant:
             # because instructions at the tails are weaker; some models treat early messages as the main thread
             # and barely weight a late system block
 
-        response = self.research_llm_with_tools.invoke(messages)
-        #print(f"research node content:{response.content}")
+        if state.get("search_count", 0) >= 5:
+            response = self.research_llm.invoke(messages) #preventing the use of tool calls when max count is reached; shall lead to the second return below directly
+        else:
+            response = self.research_llm_with_tools.invoke(messages)
+
+
         if response.tool_calls:
             return {
                 "messages" : [response],
-                "status" : "Researcher requested tool use..."
+                "status" : "Researcher requested tool use...",
+                "search_count": 1
             }
         
         return{
