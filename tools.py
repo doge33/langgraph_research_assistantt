@@ -3,7 +3,8 @@ from langchain_community.agent_toolkits import FileManagementToolkit, PlayWright
 from langchain_community.utilities import GoogleSerperAPIWrapper
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
-from markdown_pdf import md_to_pdf
+from markdown_to_pdf import md_to_pdf
+import os
 
 
 
@@ -11,6 +12,7 @@ from markdown_pdf import md_to_pdf
 # PlayWright is special because it returns objects(browser, playwright) that needs to be cleaned up later
 # PW is also heavier than other tools
 # 1. playwright
+load_dotenv(override=True)
 async def playwright_tools():
     # steps: start playwright, launch chromium
     playwright = await async_playwright().start()
@@ -19,6 +21,7 @@ async def playwright_tools():
     return toolkit.get_tools(), browser, playwright # return these for cleaning
 
 # 2. serper/google, to be used for researcher toghether with playwright
+#serper_api_key = os.getenv("SERPER_API_KEY")
 serper = GoogleSerperAPIWrapper()
 google_tool = Tool(
     name="google",

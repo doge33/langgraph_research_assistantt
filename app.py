@@ -1,61 +1,60 @@
+# gradio ui, reset, cleanups
 import gradio as gr
-from sidekick import Sidekick
-
+from research_assistant import ResearchAssistant
 
 async def setup():
-    sidekick = Sidekick()
-    await sidekick.setup()
-    return sidekick
+    assistant = ResearchAssistant()
+    await assistant.setup()
+    return assistant
 
-
-async def process_message(sidekick, message, success_criteria, history):
-    results = await sidekick.run_superstep(message, success_criteria, history)
-    return results, sidekick
-
+async def process_message(assistant, message, success_criteria, history):
+    results = await assistant.run_superstep(message, success_criteria, history)
+    return results +[assistant]
 
 async def reset():
-    new_sidekick = Sidekick()
-    await new_sidekick.setup()
-    return "", "", None, new_sidekick
+    new_assistant = ResearchAssistant()
+    await new_assistant.setup()
+    return "", "", None, None, None, new_assistant
 
-
-def free_resources(sidekick):
+async def free_resources(assistant):
     print("Cleaning up")
     try:
-        if sidekick:
-            sidekick.cleanup()
+        if assistant:
+            assistant.cleanup()
     except Exception as e:
         print(f"Exception during cleanup: {e}")
 
 
-with gr.Blocks(title="Sidekick", theme=gr.themes.Default(primary_hue="emerald")) as ui:
-    gr.Markdown("## Sidekick Personal Co-Worker")
-    sidekick = gr.State(delete_callback=free_resources)
+with gr.Blocks(theme=gr.themes.Default(primary_hue="emerald")) as demo:
+    gr.Markdown("## Deep Research Assistant")
+    assistant = gr.State(delete_callback=free_resources) #create new assistant object
 
     with gr.Row():
-        chatbot = gr.Chatbot(label="Sidekick", height=300, type="messages")
-    with gr.Group():
-        with gr.Row():
-            message = gr.Textbox(show_label=False, placeholder="Your request to the Sidekick")
-        with gr.Row():
-            success_criteria = gr.Textbox(
-                show_label=False, placeholder="What are your success critiera?"
-            )
+        with gr.Column():
+            with gr.Row():
+                chatbot = gr.Chatbot(label="Research Assistant", height=200, type="messages")
+            with gr.Group():
+                with gr.Row():
+                    message = gr.Textbox(placeholder="Please enter your research query here.")
+                with gr.Row():
+                    success_criteria=gr.Textbox(placeholder="What are your success criteria?")
+
+        with gr.Column():
+            with gr.Row():
+                topic=gr.Markdown()
+            #with gr.Row():
+                #status=gr.Markdown() # status is not doing what we want(only update at the end about final report generated)
+            with gr.Row():
+                feedback=gr.Markdown()
+            with gr.Row():
+                final_report=gr.Markdown(height=500)
+    
+    demo.load(setup, [], [assistant])
     with gr.Row():
-        reset_button = gr.Button("Reset", variant="stop")
-        go_button = gr.Button("Go!", variant="primary")
+        reset_button=gr.Button("Reset", variant="stop")
+        go_button=gr.Button("Go!", variant="primary")
 
-    ui.load(setup, [], [sidekick])
-    message.submit(
-        process_message, [sidekick, message, success_criteria, chatbot], [chatbot, sidekick]
-    )
-    success_criteria.submit(
-        process_message, [sidekick, message, success_criteria, chatbot], [chatbot, sidekick]
-    )
-    go_button.click(
-        process_message, [sidekick, message, success_criteria, chatbot], [chatbot, sidekick]
-    )
-    reset_button.click(reset, [], [message, success_criteria, chatbot, sidekick])
+    go_button.click(process_message, [assistant, message, success_criteria, chatbot], [chatbot, topic, feedback, final_report, assistant])
+    reset_button.click(reset, [], [message, success_criteria, chatbot, topic, final_report, assistant])
 
-
-ui.launch(inbrowser=True)
+demo.launch()

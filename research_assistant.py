@@ -336,7 +336,7 @@ class ResearchAssistant:
         }
 
 
-    async def build_grraph(self):
+    async def build_graph(self):
         graph_builder = StateGraph(State)
         # nodes
         graph_builder.add_node("intent_checker", self.intent_checker)
@@ -381,12 +381,8 @@ class ResearchAssistant:
         research_objective=result['research_plan'].objective
         research_topics=result['research_plan'].key_topics
         #return history in the chat
-        return(
-            history,
-            research_objective, #lets just return the objective for now
-            result["rework_feedback"],
-            result["research_result"]
-        )
+        return [history, research_objective, result["rework_feedback"], result["research_result"]]
+        
     
     
     
