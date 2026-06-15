@@ -19,5 +19,5 @@ draft.ipynb
 4_lab4.ipynb
 
 starter_code/
-markdown_reports/
-reports/
+markdown_reports/*
+reports/*
